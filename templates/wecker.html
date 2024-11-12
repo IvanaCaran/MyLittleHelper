@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wecker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+        }
+        .alarm-card {
+            background-color: #333;
+            color: #fefefe;
+            padding: 1rem;
+            margin: 1rem 0;
+            position: relative;
+            border-radius: 8px;
+        }
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #fefefe;
+            font-size: 1.5rem;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            cursor: pointer;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Wecker</h2>
+        <div class="form-group">
+            <label for="alarm-time" class="form-label">Weckerzeit:</label>
+            <input type="time" id="alarm-time" class="form-control w-50 mx-auto">
+            <button id="set-alarm" class="btn btn-outline-light mt-3">Wecker stellen</button>
+        </div>
+
+        <div id="active-alarms" class="mt-4"></div>
+    </div>
+
+    <script>
+        const alarmTimeInput = document.getElementById("alarm-time");
+        const setAlarmButton = document.getElementById("set-alarm");
+        const activeAlarmsContainer = document.getElementById("active-alarms");
+
+        let alarmsArray = [];
+        let alarmSound = new Audio("alarm.mp3");
+        let alarmIndex = 0;
+
+        const appendZero = (value) => (value < 10 ? "0" + value : value);
+
+        const displayTimer = () => {
+            const now = new Date();
+            const hours = appendZero(now.getHours());
+            const minutes = appendZero(now.getMinutes());
+
+            alarmsArray.forEach((alarm, index) => {
+                if (alarm.isActive && `${alarm.alarmHour}:${alarm.alarmMinute}` === `${hours}:${minutes}`) {
+                    alarmSound.play();
+                    alarmSound.loop = true;
+                }
+            });
+        };
+
+        const createAlarmElement = (alarmObj) => {
+            const { id, alarmHour, alarmMinute } = alarmObj;
+            const alarmDiv = document.createElement("div");
+            alarmDiv.classList.add("alarm-card");
+            alarmDiv.setAttribute("data-id", id);
+
+            // Alarm Time Display
+            alarmDiv.innerHTML = `
+                <span>${alarmHour}:${alarmMinute}</span>
+                <button class="delete-btn">&times;</button>
+                <label class="switch">
+                    <input type="checkbox" ${alarmObj.isActive ? "checked" : ""}>
+                    <span class="slider"></span>
+                </label>
+            `;
+
+            // Delete button event
+            const deleteButton = alarmDiv.querySelector(".delete-btn");
+            deleteButton.addEventListener("click", (e) => deleteAlarm(e));
+
+            // Slider toggle event
+            const slider = alarmDiv.querySelector(".switch input");
+            slider.addEventListener("change", (e) => toggleAlarm(e, id));
+
+            activeAlarmsContainer.appendChild(alarmDiv);
+        };
+
+        const toggleAlarm = (e, id) => {
+            const [exists, alarm, index] = searchObject("id", id);
+            if (exists) {
+                alarmsArray[index].isActive = e.target.checked;
+                if (!e.target.checked) {
+                    alarmSound.pause();
+                    alarmSound.currentTime = 0;
+                }
+            }
+        };
+
+        const deleteAlarm = (e) => {
+            const alarmDiv = e.target.parentElement;
+            const alarmId = alarmDiv.getAttribute("data-id");
+            const [exists, alarm, index] = searchObject("id", alarmId);
+            if (exists) {
+                alarmDiv.remove();
+                alarmsArray.splice(index, 1);
+                alarmSound.pause();
+                alarmSound.currentTime = 0;
+            }
+        };
+
+        const searchObject = (parameter, value) => {
+            let alarmObject, objIndex, exists = false;
+            alarmsArray.forEach((alarm, index) => {
+                if (alarm[parameter] === value) {
+                    exists = true;
+                    alarmObject = alarm;
+                    objIndex = index;
+                }
+            });
+            return [exists, alarmObject, objIndex];
+        };
+
+        setAlarmButton.addEventListener("click", () => {
+            const alarmTime = alarmTimeInput.value.split(":");
+            if (alarmTime.length === 2) {
+                const [hour, minute] = alarmTime;
+                alarmIndex += 1;
+                const alarmObj = {
+                    id: `alarm_${alarmIndex}`,
+                    alarmHour: hour,
+                    alarmMinute: minute,
+                    isActive: false,
+                };
+                alarmsArray.push(alarmObj);
+                createAlarmElement(alarmObj);
+            }
+        });
+
+        setInterval(displayTimer, 1000);
+    </script>
+</body>
+</html>
