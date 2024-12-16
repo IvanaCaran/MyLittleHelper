@@ -72,7 +72,7 @@ cmd_vel_topic = roslibpy.Topic(ros, '/cmd_vel', 'geometry_msgs/Twist')
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('navigation.html')
 
 @app.route('/move', methods=['POST'])
 def move():
