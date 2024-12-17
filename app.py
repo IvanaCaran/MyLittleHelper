@@ -9,9 +9,21 @@ import os
 load_dotenv()
 
 api_key = os.getenv("WEATHER_API_KEY")
-api_key = os.getenv("API_KEY")
+news_api_key = os.getenv("API_KEY")
 
 app = Flask(__name__)
+
+# ROS-Verbindung einrichten
+ros = roslibpy.Ros(host='192.168.3.31', port=9090)
+cmd_vel_topic = roslibpy.Topic(ros, '/cmd_vel', 'geometry_msgs/Twist')
+
+try:
+    ros.run()  # Verbindung zu ROS herstellen
+    print("ROS connected successfully!")
+except Exception as e:
+    print(f"Failed to connect to ROS: {e}")
+
+
 
 #Startseite
 @app.route("/")
@@ -63,47 +75,46 @@ def index():
     return render_template("wetter.html", data=weather_data)
 
 
-    # Connect to ROS
-ros = roslibpy.Ros(host='localhost', port=9090)
-ros.run()
+# Navigations-Seite für den ROS-Roboter
+@app.route("/navigation")
+def navigation_page():
+    return render_template("navigation.html")
 
-# Define the ROS topic for velocity commands
-cmd_vel_topic = roslibpy.Topic(ros, '/cmd_vel', 'geometry_msgs/Twist')
+# Steuerung des Roboters
+@app.route("/move", methods=["POST"])
+def move_robot():
+    direction = request.json.get("direction")
 
-@app.route('/')
-def index():
-    return render_template('navigation.html')
-
-@app.route('/move', methods=['POST'])
-def move():
-    direction = request.json.get('direction')
-
-    
+    # Twist-Nachricht erstellen
     twist = {
-        'linear': {'x': 0.0, 'y': 0.0, 'z': 0.0},
-        'angular': {'x': 0.0, 'y': 0.0, 'z': 0.0}
+        "linear": {"x": 0.0, "y": 0.0, "z": 0.0},
+        "angular": {"x": 0.0, "y": 0.0, "z": 0.0},
     }
 
-    if direction == 'forward':
-        twist['linear']['x'] = 0.5
-    elif direction == 'backward':
-        twist['linear']['x'] = -0.5
-    elif direction == 'left':
-        twist['angular']['z'] = 0.5
-    elif direction == 'right':
-        twist['angular']['z'] = -0.5
-    elif direction == 'stop':
-        pass  # No movement
+    if direction == "forward":
+        twist["linear"]["x"] = 0.5
+    elif direction == "backward":
+        twist["linear"]["x"] = -0.5
+    elif direction == "left":
+        twist["angular"]["z"] = 0.5
+    elif direction == "right":
+        twist["angular"]["z"] = -0.5
+    elif direction == "stop":
+        pass  # Keine Bewegung
 
-    
-    cmd_vel_topic.publish(roslibpy.Message(twist))
-
-    return jsonify({'status': 'success', 'direction': direction})
+    # Nachricht an ROS senden
+    try:
+        cmd_vel_topic.publish(roslibpy.Message(twist))
+        return jsonify({"status": "success", "direction": direction})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 # Flask-Anwendung ausführen
 if __name__ == "__main__":
     try:
         app.run(debug=True)
     finally:
+        # ROS-Verbindung sauber schließen
         cmd_vel_topic.unadvertise()
         ros.terminate()
+        print("ROS connection terminated.")
