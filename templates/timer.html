@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wecker und Timer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+        }
+        .timer-card {
+            background-color: #333;
+            color: #fefefe;
+            padding: 1rem;
+            margin: 1rem 0;
+            position: relative;
+            border-radius: 8px;
+        }
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #fefefe;
+            font-size: 1.5rem;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Timer einstellen</h2>
+        <div class="form-group">
+            <label for="timer-name" class="form-label">Timer-Name:</label>
+            <input type="text" id="timer-name" class="form-control w-50 mx-auto" placeholder="Name des Timers">
+        </div>
+        <div class="form-group">
+            <label for="timer-duration" class="form-label">Dauer (Sekunden):</label>
+            <input type="number" id="timer-duration" class="form-control w-50 mx-auto" min="1" placeholder="z.B. 30">
+        </div>
+        <div class="form-group">
+            <label for="repeat-timer" class="form-label">Wiederholen:</label>
+            <input type="checkbox" id="repeat-timer">
+        </div>
+        <div class="form-group">
+            <label for="timer-sound" class="form-label">Timer-Sound:</label>
+            <select id="timer-sound" class="form-control w-50 mx-auto">
+                <option value="alarm.mp3">Alarm</option>
+                <option value="beep.mp3">Beep</option>
+                <option value="ringtone.mp3">Ringtone</option>
+            </select>
+        </div>
+        <button id="set-timer" class="btn btn-outline-light mt-3">Timer hinzufügen</button>
+
+        <h3 class="mt-4">Aktive Timer</h3>
+        <div id="active-timers"></div>
+    </div>
+
+    <script>
+        const timerNameInput = document.getElementById("timer-name");
+        const timerDurationInput = document.getElementById("timer-duration");
+        const repeatTimerCheckbox = document.getElementById("repeat-timer");
+        const timerSoundSelect = document.getElementById("timer-sound");
+        const setTimerButton = document.getElementById("set-timer");
+        const activeTimersContainer = document.getElementById("active-timers");
+
+        let timerIndex = 0;
+
+        setTimerButton.addEventListener("click", () => {
+            const timerName = timerNameInput.value.trim() || `Timer ${timerIndex + 1}`;
+            const timerDuration = parseInt(timerDurationInput.value, 10);
+            const repeat = repeatTimerCheckbox.checked;
+            const sound = timerSoundSelect.value;
+
+            if (timerDuration > 0) {
+                const timerObj = { id: `timer_${timerIndex++}`, name: timerName, duration: timerDuration, repeat, sound };
+                createTimerElement(timerObj);
+                startTimer(timerObj);
+            }
+        });
+
+        const startTimer = (timerObj) => {
+            const { duration, sound, repeat } = timerObj;
+            const timerSound = new Audio(sound);
+
+            const playSound = () => {
+                timerSound.play();
+                timerSound.loop = true;
+
+                setTimeout(() => {
+                    timerSound.pause();
+                    timerSound.currentTime = 0;
+                    if (repeat) setTimeout(playSound, duration * 1000);
+                }, 15000);
+            };
+
+            setTimeout(playSound, duration * 1000);
+        };
+
+        const createTimerElement = (timerObj) => {
+            const { id, name, duration, repeat } = timerObj;
+
+            const timerDiv = document.createElement("div");
+            timerDiv.classList.add("timer-card");
+            timerDiv.setAttribute("data-id", id);
+
+            timerDiv.innerHTML = `
+                <span><strong>${name}</strong> - ${duration}s ${repeat ? "(Wiederholung)" : ""}</span>
+                <button class="delete-btn">&times;</button>
+            `;
+
+            const deleteButton = timerDiv.querySelector(".delete-btn");
+            deleteButton.addEventListener("click", () => {
+                timerDiv.remove();
+            });
+
+            activeTimersContainer.appendChild(timerDiv);
+        };
+    </script>
+</body>
+</html>

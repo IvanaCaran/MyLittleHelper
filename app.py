@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify
 from weather import get_lat_lon, get_current_weather
-from news import get_latest_news
 from dotenv import load_dotenv
 import roslibpy
 import os
+import time
+import roslibpy.actionlib
 
 
 load_dotenv()
@@ -16,14 +17,13 @@ app = Flask(__name__)
 # ROS-Verbindung einrichten
 ros = roslibpy.Ros(host='192.168.3.31', port=9090)
 cmd_vel_topic = roslibpy.Topic(ros, '/cmd_vel', 'geometry_msgs/Twist')
+odom_topic = roslibpy.Topic(ros, '/odom', 'nav_msgs/Odometry')
 
 try:
     ros.run()  # Verbindung zu ROS herstellen
     print("ROS connected successfully!")
 except Exception as e:
     print(f"Failed to connect to ROS: {e}")
-
-
 
 #Startseite
 @app.route("/")
@@ -35,22 +35,15 @@ def startseite():
 def wecker():
     return render_template("wecker.html")
 
-# News
-@app.route('/news', methods=["GET", "POST"])
-def news_page():
-   
-    topic = None
-    date = None
+#Timer
+@app.route("/timer")
+def timer():
+    return render_template("timer.html")
 
-    if request.method == "POST":
-        topic = request.form.get('topic')
-        date = request.form.get('date')
-
-    # Abruf der Nachrichten basierend auf Thema und Datum oder ohne Filter
-    news_data = get_latest_news(topic, date)
-
-    # Die Nachrichten an die Vorlage `news.html` übergeben
-    return render_template("news.html", news_data=news_data)
+#alarmsystem
+@app.route("/alarmsystem")
+def alarmsystem():
+    return render_template("alarmsystem.html")
 
 #Wetterbericht
 
@@ -78,6 +71,7 @@ def index():
 # Navigations-Seite für den ROS-Roboter
 @app.route("/navigation")
 def navigation_page():
+    "map_image_path = '/1501flur1.pgm' "
     return render_template("navigation.html")
 
 # Steuerung des Roboters
@@ -108,6 +102,57 @@ def move_robot():
         return jsonify({"status": "success", "direction": direction})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
+    
+
+# Route für die Karte und Roboterposition
+@app.route('/map')
+def map_page():
+    position = None
+
+    def callback(message):
+        nonlocal position
+        position = get_robot_position(message)
+
+    odom_topic.subscribe(callback)
+
+    time.sleep(0.1) 
+
+    # Wenn Position empfangen wurde sende sie als JSON zurück und render die Karte
+    if position:
+        return render_template('map.html', robot_position=position)
+    else:
+        return render_template('map.html', error='Keine Position erhalten')
+
+@app.route("/navigate_to_goal", methods=["POST"])
+def navigate_to_goal():
+    try:
+        goal_message = {
+            'header': {'frame_id': 'map'},
+            'goal': {
+                'target_pose': {
+                    'pose': {
+                        'position': {'x': 1, 'y': 1.0, 'z': 0.0},
+                        'orientation': {'x': 0.0, 'y': 0.0, 'z': 0.0, 'w': 1.0}
+                    }
+                }
+            }
+        }
+        move_base_topic = roslibpy.Topic(ros, '/move_base/goal', 'move_base_msgs/MoveBaseActionGoal')
+        move_base_topic.publish(roslibpy.Message(goal_message))
+        move_base_topic.unadvertise()
+        return jsonify({"status": "success", "message": "Goal sent to the robot."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+    
+
+
+# Die Funktion, die die Roboterposition aus den Odometrie-Daten extrahiert
+def get_robot_position(message):
+    position = {
+        'x': message['pose']['pose']['position']['x'],
+        'y': message['pose']['pose']['position']['y']
+    }
+    return position
 
 # Flask-Anwendung ausführen
 if __name__ == "__main__":
