@@ -5,12 +5,12 @@ import roslibpy
 import os
 import time
 import roslibpy.actionlib
+from wecker import add_alarm, delete_alarm, toggle_alarm, load_alarms, check_alarms, play_sound 
+import threading
 
 
 load_dotenv()
-
 api_key = os.getenv("WEATHER_API_KEY")
-news_api_key = os.getenv("API_KEY")
 
 app = Flask(__name__)
 
@@ -31,19 +31,48 @@ def startseite():
     return render_template("Startseite.html")
 
 #Wecker
-@app.route("/wecker")
-def wecker():
-    return render_template("wecker.html")
+@app.route('/wecker', methods=["GET", "POST"])
+def wecker_page():
+    if request.method == "POST":
+        time = request.form.get('time')
+        label = request.form.get('label')
+        add_alarm(time, label)
+        return redirect(url_for('wecker_page'))
+    
+    alarms = load_alarms()
+    return render_template("wecker.html", alarms=alarms)
+@app.route('/wecker/delete/<int:index>', methods=["POST"])
+def delete_alarm_route(index):
+    delete_alarm(index)
+    return redirect(url_for('wecker_page'))
 
-#Timer
-@app.route("/timer")
-def timer():
-    return render_template("timer.html")
+@app.route('/wecker/toggle/<int:index>', methods=["POST"])
+def toggle_alarm_route(index):
+    enabled = request.form.get('enabled') == 'on'
+    toggle_alarm(index, enabled)
+    return redirect(url_for('wecker_page'))
+
+# Hintergrund-Thread zum Überprüfen der Alarme
+def alarm_checker():
+    while True:
+        check_alarms()
+        time.sleep(60)  # Überprüfen Sie jede Minute die Alarme
+
+if __name__ == "__main__":
+    threading.Thread(target=alarm_checker, daemon=True).start()
+    app.run(debug=True)
+
 
 #alarmsystem
 @app.route("/alarmsystem")
 def alarmsystem():
-    return render_template("alarmsystem.html")
+    try:
+        # alarmsystem.py ausführen
+        subprocess.run(["python3", "alarmsystem.py"], check=True)
+        return render_template("alarmsystem.html", message="Alarmsystem gestartet!")
+    except subprocess.CalledProcessError as e:
+        return render_template("alarmsystem.html", message=f"Fehler beim Starten des Alarmsystems: {e}")
+
 
 #Wetterbericht
 

@@ -26,6 +26,8 @@ def get_lat_lon(city_name, state_code, country_code, API_key):
         print("Fehler bei der Anfrage:", e)
         return None, None
 
+
+
 def get_current_weather(lat, lon, API_key):
     """Liefert aktuelle Wetterdaten für die angegebenen Koordinaten."""
     try:
